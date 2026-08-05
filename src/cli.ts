@@ -6,6 +6,7 @@ import {
   buildCreateTimeEntryInput,
   computeSummary,
   entryWorkspaceId,
+  filterEntriesAlreadyInTarget,
   fingerprintTimeEntry,
   formatDuration,
   gatherSourceProjectRequirements,
@@ -125,6 +126,9 @@ function printSummary(summary: ReturnType<typeof computeSummary>): void {
   if (summary.alreadyCopiedSkipped > 0) {
     console.log(`  ${summary.alreadyCopiedSkipped} previously copied entries ignored`);
   }
+  if (summary.alreadyPresentInTargetSkipped > 0) {
+    console.log(`  ${summary.alreadyPresentInTargetSkipped} matching TO entries ignored`);
+  }
 }
 
 async function run(): Promise<void> {
@@ -157,13 +161,13 @@ async function run(): Promise<void> {
     fromClient.getProjects(fromWorkspaceId),
     toClient.getProjects(toWorkspaceId),
   ]);
-  const { entries, runningEntriesSkipped, alreadyCopiedSkipped } = selectEntriesToCopy(
+  const { entries: gatheredEntries, runningEntriesSkipped, alreadyCopiedSkipped } = selectEntriesToCopy(
     fetchedEntries,
     fromWorkspaceId,
     config.copiedEntries,
   );
 
-  if (entries.length === 0) {
+  if (gatheredEntries.length === 0) {
     console.log("Nothing new to copy.");
     if (runningEntriesSkipped > 0) {
       console.log(`${runningEntriesSkipped} running entries were skipped.`);
@@ -171,14 +175,30 @@ async function run(): Promise<void> {
     return;
   }
 
-  const requirements = gatherSourceProjectRequirements(entries, sourceProjects);
+  const requirements = gatherSourceProjectRequirements(gatheredEntries, sourceProjects);
   await ensureProjectMappings(config, requirements, targetProjects);
+
+  console.log("Checking mapped entries already present in TO ACCOUNT…");
+  const targetEntries = await toClient.getTimeEntries(gatheredEntries[0]!.start, endDate);
+  const { entries, alreadyPresentInTargetSkipped } = filterEntriesAlreadyInTarget(
+    gatheredEntries,
+    targetEntries,
+    toWorkspaceId,
+    config,
+  );
+  if (entries.length === 0) {
+    console.log(
+      `Nothing new to copy. ${alreadyPresentInTargetSkipped} matching entries already exist in TO ACCOUNT.`,
+    );
+    return;
+  }
 
   const summary = computeSummary(
     entries,
     config,
     runningEntriesSkipped,
     alreadyCopiedSkipped,
+    alreadyPresentInTargetSkipped,
   );
   printSummary(summary);
   const approved = await confirm({ message: "Continue with the copy?", default: false });
@@ -227,4 +247,3 @@ run().catch((error: unknown) => {
   console.error(`Config: ${CONFIG_PATH}`);
   process.exitCode = 1;
 });
-

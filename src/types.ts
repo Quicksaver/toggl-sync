@@ -87,5 +87,5 @@ export interface SyncSummary {
   latestStart: string;
   runningEntriesSkipped: number;
   alreadyCopiedSkipped: number;
+  alreadyPresentInTargetSkipped: number;
 }
-

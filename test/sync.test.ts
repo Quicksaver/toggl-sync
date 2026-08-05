@@ -6,6 +6,7 @@ import {
   SYNC_TAG,
   buildCreateTimeEntryInput,
   computeSummary,
+  filterEntriesAlreadyInTarget,
   fingerprintTimeEntry,
   gatherSourceProjectRequirements,
   latestCopiedEntry,
@@ -97,6 +98,112 @@ describe("entry selection and cursor provenance", () => {
     assert.equal(result.alreadyCopiedSkipped, 1);
   });
 
+  it("filters mapped entries already present in the target using multiset counts", () => {
+    const syncConfig = config();
+    syncConfig.projectMappings["project:20"] = {
+      fromProjectName: "Source project",
+      toProjectId: 30,
+      toProjectName: "Target",
+    };
+    const firstSource = entry();
+    const secondIdenticalSource = entry({ id: 2 });
+    const differentSource = entry({ id: 3, description: "Different work" });
+    const result = filterEntriesAlreadyInTarget(
+      [firstSource, secondIdenticalSource, differentSource],
+      [
+        entry({
+          id: 101,
+          workspace_id: 11,
+          project_id: 30,
+          start: "2026-08-01T10:00:02+00:00",
+          duration: 3_599,
+        }),
+      ],
+      11,
+      syncConfig,
+    );
+
+    assert.equal(result.alreadyPresentInTargetSkipped, 1);
+    assert.deepEqual(result.entries.map(({ id }) => id), [2, 3]);
+  });
+
+  it("does not filter temporal differences outside the duplicate tolerance", () => {
+    const syncConfig = config();
+    syncConfig.projectMappings["project:20"] = {
+      fromProjectName: "Source project",
+      toProjectId: 30,
+      toProjectName: "Target",
+    };
+    const result = filterEntriesAlreadyInTarget(
+      [entry(), entry({ id: 2, start: "2026-08-02T10:00:00Z" })],
+      [
+        entry({
+          id: 101,
+          workspace_id: 11,
+          project_id: 30,
+          start: "2026-08-01T10:00:04Z",
+        }),
+        entry({
+          id: 102,
+          workspace_id: 11,
+          project_id: 30,
+          start: "2026-08-02T10:00:00Z",
+          duration: 3_597,
+        }),
+      ],
+      11,
+      syncConfig,
+    );
+
+    assert.equal(result.alreadyPresentInTargetSkipped, 0);
+    assert.deepEqual(result.entries.map(({ id }) => id), [1, 2]);
+  });
+
+  it("reassigns a close match when necessary to avoid duplicating another source entry", () => {
+    const syncConfig = config();
+    syncConfig.projectMappings["project:20"] = {
+      fromProjectName: "Source project",
+      toProjectId: 30,
+      toProjectName: "Target",
+    };
+    const result = filterEntriesAlreadyInTarget(
+      [
+        entry({ id: 1, start: "2026-08-01T10:00:00Z" }),
+        entry({ id: 2, start: "2026-08-01T09:59:57Z" }),
+      ],
+      [
+        entry({ id: 101, workspace_id: 11, project_id: 30, start: "2026-08-01T10:00:00Z" }),
+        entry({ id: 102, workspace_id: 11, project_id: 30, start: "2026-08-01T10:00:03Z" }),
+      ],
+      11,
+      syncConfig,
+    );
+
+    assert.equal(result.alreadyPresentInTargetSkipped, 2);
+    assert.deepEqual(result.entries, []);
+  });
+
+  it("does not filter target entries from another workspace or mapped project", () => {
+    const syncConfig = config();
+    syncConfig.projectMappings["project:20"] = {
+      fromProjectName: "Source project",
+      toProjectId: 30,
+      toProjectName: "Target",
+    };
+    const result = filterEntriesAlreadyInTarget(
+      [entry()],
+      [
+        entry({ id: 101, workspace_id: 999, project_id: 30 }),
+        entry({ id: 102, workspace_id: 11, project_id: 31 }),
+      ],
+      11,
+      syncConfig,
+    );
+
+    assert.equal(result.alreadyPresentInTargetSkipped, 0);
+    assert.deepEqual(result.entries.map(({ id }) => id), [1]);
+  });
+
   it("chooses the newest copied source timestamp", () => {
     const records: CopiedEntryRecord[] = [
       {
@@ -165,7 +272,7 @@ describe("copy payload and summary", () => {
       toProjectId: 30,
       toProjectName: "Target",
     };
-    const summary = computeSummary([entry(), entry({ id: 2 })], syncConfig, 1, 3);
+    const summary = computeSummary([entry(), entry({ id: 2 })], syncConfig, 1, 3, 4);
 
     assert.equal(summary.entryCount, 2);
     assert.equal(summary.sourceProjectCount, 1);
@@ -173,6 +280,6 @@ describe("copy payload and summary", () => {
     assert.equal(summary.durationSeconds, 7_202);
     assert.equal(summary.runningEntriesSkipped, 1);
     assert.equal(summary.alreadyCopiedSkipped, 3);
+    assert.equal(summary.alreadyPresentInTargetSkipped, 4);
   });
 });
-

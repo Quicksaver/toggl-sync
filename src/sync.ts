@@ -13,6 +13,8 @@ import type {
 export const INITIAL_LOOKBACK_DAYS = 60;
 export const SYNC_TAG = "toggl-sync";
 export const NO_PROJECT_KEY = "no-project";
+export const DUPLICATE_START_TOLERANCE_SECONDS = 3;
+export const DUPLICATE_DURATION_TOLERANCE_SECONDS = 3;
 
 export function entryWorkspaceId(entry: TogglTimeEntry): number | undefined {
   return entry.workspace_id ?? entry.wid;
@@ -162,6 +164,92 @@ export function selectEntriesToCopy(
   return { entries, runningEntriesSkipped, alreadyCopiedSkipped };
 }
 
+function duplicateDistance(
+  sourceEntry: TogglTimeEntry,
+  targetEntry: TogglTimeEntry,
+  targetProjectId: number,
+): number | null {
+  if (
+    entryProjectId(targetEntry) !== targetProjectId ||
+    (targetEntry.description ?? "") !== (sourceEntry.description ?? "")
+  ) {
+    return null;
+  }
+
+  const sourceStart = Date.parse(sourceEntry.start);
+  const targetStart = Date.parse(targetEntry.start);
+  if (!Number.isFinite(sourceStart) || !Number.isFinite(targetStart)) return null;
+
+  const startDeltaSeconds = Math.abs(sourceStart - targetStart) / 1_000;
+  const durationDeltaSeconds = Math.abs(sourceEntry.duration - targetEntry.duration);
+  if (
+    startDeltaSeconds > DUPLICATE_START_TOLERANCE_SECONDS ||
+    durationDeltaSeconds > DUPLICATE_DURATION_TOLERANCE_SECONDS
+  ) {
+    return null;
+  }
+
+  return startDeltaSeconds + durationDeltaSeconds;
+}
+
+export function filterEntriesAlreadyInTarget(
+  sourceEntries: TogglTimeEntry[],
+  targetEntries: TogglTimeEntry[],
+  targetWorkspaceId: number,
+  config: SyncConfig,
+): { entries: TogglTimeEntry[]; alreadyPresentInTargetSkipped: number } {
+  const availableTargetEntries = targetEntries.filter(
+    (targetEntry) =>
+      entryWorkspaceId(targetEntry) === targetWorkspaceId &&
+      entryProjectId(targetEntry) !== null &&
+      isCompletedEntry(targetEntry),
+  );
+
+  const candidateTargetIndexes = sourceEntries.map((sourceEntry) => {
+    const mapping = config.projectMappings[sourceProjectKey(sourceEntry)];
+    if (!mapping) {
+      throw new Error(`Missing project mapping for ${sourceProjectKey(sourceEntry)}.`);
+    }
+    return availableTargetEntries
+      .map((targetEntry, index) => ({
+        index,
+        distance: duplicateDistance(sourceEntry, targetEntry, mapping.toProjectId),
+      }))
+      .filter((candidate): candidate is { index: number; distance: number } =>
+        candidate.distance !== null,
+      )
+      .sort((left, right) => left.distance - right.distance)
+      .map(({ index }) => index);
+  });
+
+  const matchedSourceByTarget = new Map<number, number>();
+  const tryMatch = (sourceIndex: number, seenTargetIndexes: Set<number>): boolean => {
+    for (const targetIndex of candidateTargetIndexes[sourceIndex] ?? []) {
+      if (seenTargetIndexes.has(targetIndex)) continue;
+      seenTargetIndexes.add(targetIndex);
+      const previouslyMatchedSource = matchedSourceByTarget.get(targetIndex);
+      if (
+        previouslyMatchedSource === undefined ||
+        tryMatch(previouslyMatchedSource, seenTargetIndexes)
+      ) {
+        matchedSourceByTarget.set(targetIndex, sourceIndex);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const matchedSourceIndexes = new Set<number>();
+  for (const sourceIndex of sourceEntries.keys()) {
+    if (tryMatch(sourceIndex, new Set())) matchedSourceIndexes.add(sourceIndex);
+  }
+
+  return {
+    entries: sourceEntries.filter((_, index) => !matchedSourceIndexes.has(index)),
+    alreadyPresentInTargetSkipped: matchedSourceIndexes.size,
+  };
+}
+
 export function buildCreateTimeEntryInput(
   sourceEntry: TogglTimeEntry,
   targetWorkspaceId: number,
@@ -186,6 +274,7 @@ export function computeSummary(
   config: SyncConfig,
   runningEntriesSkipped: number,
   alreadyCopiedSkipped: number,
+  alreadyPresentInTargetSkipped: number,
 ): SyncSummary {
   if (entries.length === 0) {
     throw new Error("Cannot summarize an empty set of entries.");
@@ -208,6 +297,7 @@ export function computeSummary(
     latestStart: starts.at(-1)!,
     runningEntriesSkipped,
     alreadyCopiedSkipped,
+    alreadyPresentInTargetSkipped,
   };
 }
 
@@ -221,4 +311,3 @@ export function formatDuration(totalSeconds: number): string {
 export function initialStartDate(now: Date): string {
   return new Date(now.getTime() - INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
-
