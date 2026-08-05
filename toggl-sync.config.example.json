@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "from": {
+    "apiToken": "PASTE_FROM_ACCOUNT_API_TOKEN_HERE",
+    "workspaceId": null
+  },
+  "to": {
+    "apiToken": "PASTE_TO_ACCOUNT_API_TOKEN_HERE",
+    "workspaceId": null
+  },
+  "projectMappings": {},
+  "copiedEntries": []
+}
+
