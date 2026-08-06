@@ -34,7 +34,7 @@ If either account has multiple workspaces, the CLI asks which one to use and sav
 - The first run reads completed FROM ACCOUNT entries from the last 60 days.
 - Every source project represented in those entries—including “No project”—must be mapped to an existing active TO ACCOUNT project using an arrow-key list.
 - Mappings are saved immediately in `toggl-sync.config.json`.
-- After mapping, the CLI fetches TO ACCOUNT entries in the gathered date range and removes matches with the same mapped project and description when start time and duration are each within 3 seconds. Matching is count-aware and chooses the closest candidate, so one existing target entry filters only one source entry.
+- After mapping, the CLI fetches TO ACCOUNT entries in the gathered date range and removes matches with the same mapped project and description when start time is within 60 seconds and duration is within 3 seconds. The target search begins one minute before the earliest gathered source entry. Matching is count-aware and chooses the closest candidate, so one existing target entry filters only one source entry.
 - The CLI prints a compact count/project/duration/date summary followed by every final entry as `Start Date & Time - Duration - Project - Description`, using the mapped TO project, and requires confirmation before creating anything.
 - Copied entries preserve description, start, exact duration in seconds, billable status, and tags. Tasks are not copied because project mappings do not establish corresponding target tasks.
 - Every copied entry receives the reserved `toggl-sync` tag. Its source ID, target ID, target fingerprint, and copy time are saved after each successful write.

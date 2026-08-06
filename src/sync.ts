@@ -13,7 +13,7 @@ import type {
 export const INITIAL_LOOKBACK_DAYS = 60;
 export const SYNC_TAG = "toggl-sync";
 export const NO_PROJECT_KEY = "no-project";
-export const DUPLICATE_START_TOLERANCE_SECONDS = 3;
+export const DUPLICATE_START_TOLERANCE_SECONDS = 60;
 export const DUPLICATE_DURATION_TOLERANCE_SECONDS = 3;
 
 export function assertDistinctWorkspaces(
@@ -323,6 +323,12 @@ export function formatMigrationEntryLine(
 ): string {
   const description = (entry.description ?? "").replace(/\s+/g, " ").trim() || "(no description)";
   return `${entry.start} - ${formatDuration(entry.duration)} - ${targetProjectName} - ${description}`;
+}
+
+export function duplicateSearchStartDate(earliestSourceStart: string): string {
+  return new Date(
+    Date.parse(earliestSourceStart) - DUPLICATE_START_TOLERANCE_SECONDS * 1_000,
+  ).toISOString();
 }
 
 export function initialStartDate(now: Date): string {

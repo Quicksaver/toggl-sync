@@ -6,6 +6,7 @@ import {
   buildCreateTimeEntryInput,
   assertDistinctWorkspaces,
   computeSummary,
+  duplicateSearchStartDate,
   entryWorkspaceId,
   filterEntriesAlreadyInTarget,
   fingerprintTimeEntry,
@@ -202,7 +203,10 @@ async function run(): Promise<void> {
   await ensureProjectMappings(config, requirements, targetProjects);
 
   console.log("Checking mapped entries already present in TO ACCOUNT…");
-  const targetEntries = await toClient.getTimeEntries(gatheredEntries[0]!.start, endDate);
+  const targetEntries = await toClient.getTimeEntries(
+    duplicateSearchStartDate(gatheredEntries[0]!.start),
+    endDate,
+  );
   const { entries, alreadyPresentInTargetSkipped } = filterEntriesAlreadyInTarget(
     gatheredEntries,
     targetEntries,

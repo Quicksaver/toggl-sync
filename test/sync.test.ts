@@ -7,6 +7,7 @@ import {
   assertDistinctWorkspaces,
   buildCreateTimeEntryInput,
   computeSummary,
+  duplicateSearchStartDate,
   filterEntriesAlreadyInTarget,
   fingerprintTimeEntry,
   formatMigrationEntryLine,
@@ -148,7 +149,7 @@ describe("entry selection and cursor provenance", () => {
           id: 101,
           workspace_id: 11,
           project_id: 30,
-          start: "2026-08-01T10:00:04Z",
+          start: "2026-08-01T10:01:01Z",
         }),
         entry({
           id: 102,
@@ -164,6 +165,13 @@ describe("entry selection and cursor provenance", () => {
 
     assert.equal(result.alreadyPresentInTargetSkipped, 0);
     assert.deepEqual(result.entries.map(({ id }) => id), [1, 2]);
+  });
+
+  it("expands the target search window by the duplicate start tolerance", () => {
+    assert.equal(
+      duplicateSearchStartDate("2026-08-01T10:00:00Z"),
+      "2026-08-01T09:59:00.000Z",
+    );
   });
 
   it("reassigns a close match when necessary to avoid duplicating another source entry", () => {
