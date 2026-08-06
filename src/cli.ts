@@ -10,6 +10,7 @@ import {
   filterEntriesAlreadyInTarget,
   fingerprintTimeEntry,
   formatDuration,
+  formatMigrationEntryLine,
   gatherSourceProjectRequirements,
   initialStartDate,
   latestCopiedEntry,
@@ -20,7 +21,13 @@ import {
   verifyLatestCopiedTarget,
 } from "./sync.js";
 import { TogglApiError, TogglClient } from "./toggl.js";
-import type { AccountConfig, SyncConfig, TogglProject, TogglWorkspace } from "./types.js";
+import type {
+  AccountConfig,
+  SyncConfig,
+  TogglProject,
+  TogglTimeEntry,
+  TogglWorkspace,
+} from "./types.js";
 
 const WRITE_DELAY_MS = 1_100;
 
@@ -110,7 +117,12 @@ async function ensureProjectMappings(
   }
 }
 
-function printSummary(summary: ReturnType<typeof computeSummary>): void {
+function printSummary(
+  summary: ReturnType<typeof computeSummary>,
+  entries: TogglTimeEntry[],
+  config: SyncConfig,
+  targetProjects: TogglProject[],
+): void {
   const decimalHours = (summary.durationSeconds / 3600).toFixed(2);
   console.log("\nReady to copy:");
   console.log(`  ${summary.entryCount} entries`);
@@ -129,6 +141,18 @@ function printSummary(summary: ReturnType<typeof computeSummary>): void {
   }
   if (summary.alreadyPresentInTargetSkipped > 0) {
     console.log(`  ${summary.alreadyPresentInTargetSkipped} matching TO entries ignored`);
+  }
+
+  const currentTargetProjectNames = new Map(
+    targetProjects.map((project) => [project.id, project.name]),
+  );
+  console.log("\nEntries:");
+  for (const entry of entries) {
+    const mapping = config.projectMappings[sourceProjectKey(entry)];
+    if (!mapping) throw new Error(`Missing project mapping for ${sourceProjectKey(entry)}.`);
+    const targetProjectName =
+      currentTargetProjectNames.get(mapping.toProjectId) ?? mapping.toProjectName;
+    console.log(formatMigrationEntryLine(entry, targetProjectName));
   }
 }
 
@@ -199,7 +223,7 @@ async function run(): Promise<void> {
     alreadyCopiedSkipped,
     alreadyPresentInTargetSkipped,
   );
-  printSummary(summary);
+  printSummary(summary, entries, config, targetProjects);
   const approved = await confirm({ message: "Continue with the copy?", default: false });
   if (!approved) {
     console.log("Cancelled. No entries were copied.");

@@ -9,6 +9,7 @@ import {
   computeSummary,
   filterEntriesAlreadyInTarget,
   fingerprintTimeEntry,
+  formatMigrationEntryLine,
   gatherSourceProjectRequirements,
   latestCopiedEntry,
   missingProjectMappings,
@@ -260,6 +261,20 @@ describe("entry selection and cursor provenance", () => {
 });
 
 describe("copy payload and summary", () => {
+  it("formats each migration entry on exactly one line", () => {
+    assert.equal(
+      formatMigrationEntryLine(
+        entry({ description: "First line\nsecond   line", duration: 3_661 }),
+        "Target project",
+      ),
+      "2026-08-01T10:00:00Z - 1h 01m 01s - Target project - First line second line",
+    );
+    assert.equal(
+      formatMigrationEntryLine(entry({ description: null }), "Target project"),
+      "2026-08-01T10:00:00Z - 1h 00m 01s - Target project - (no description)",
+    );
+  });
+
   it("preserves seconds and adds the provenance tag", () => {
     const input = buildCreateTimeEntryInput(entry(), 11, 30);
 

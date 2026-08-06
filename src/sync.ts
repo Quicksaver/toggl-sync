@@ -317,6 +317,14 @@ export function formatDuration(totalSeconds: number): string {
   return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
 }
 
+export function formatMigrationEntryLine(
+  entry: TogglTimeEntry,
+  targetProjectName: string,
+): string {
+  const description = (entry.description ?? "").replace(/\s+/g, " ").trim() || "(no description)";
+  return `${entry.start} - ${formatDuration(entry.duration)} - ${targetProjectName} - ${description}`;
+}
+
 export function initialStartDate(now: Date): string {
   return new Date(now.getTime() - INITIAL_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
