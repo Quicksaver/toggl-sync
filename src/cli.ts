@@ -4,6 +4,7 @@ import { confirm, select } from "@inquirer/prompts";
 import { CONFIG_PATH, loadConfig, saveConfig } from "./config.js";
 import {
   buildCreateTimeEntryInput,
+  assertDistinctWorkspaces,
   computeSummary,
   entryWorkspaceId,
   filterEntriesAlreadyInTarget,
@@ -139,9 +140,7 @@ async function run(): Promise<void> {
   console.log("Connecting to Toggl…");
   const fromWorkspaceId = await resolveWorkspace("FROM ACCOUNT", config.from, fromClient, config);
   const toWorkspaceId = await resolveWorkspace("TO ACCOUNT", config.to, toClient, config);
-  if (fromWorkspaceId === toWorkspaceId && config.from.apiToken === config.to.apiToken) {
-    throw new Error("FROM and TO resolve to the same account and workspace.");
-  }
+  assertDistinctWorkspaces(fromWorkspaceId, toWorkspaceId);
 
   const newestCopy = latestCopiedEntry(config.copiedEntries);
   let startDate: string;

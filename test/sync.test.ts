@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   NO_PROJECT_KEY,
   SYNC_TAG,
+  assertDistinctWorkspaces,
   buildCreateTimeEntryInput,
   computeSummary,
   filterEntriesAlreadyInTarget,
@@ -44,6 +45,11 @@ function config(): SyncConfig {
 }
 
 describe("project mapping", () => {
+  it("allows one account to sync between different workspaces", () => {
+    assert.doesNotThrow(() => assertDistinctWorkspaces(10, 11));
+    assert.throws(() => assertDistinctWorkspaces(10, 10), /must be different workspaces/);
+  });
+
   it("requires a mapping for every represented source project, including no project", () => {
     const entries = [entry(), entry({ id: 2, project_id: null, project_name: null })];
     const requirements = gatherSourceProjectRequirements(entries, []);

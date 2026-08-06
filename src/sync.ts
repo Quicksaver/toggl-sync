@@ -16,6 +16,15 @@ export const NO_PROJECT_KEY = "no-project";
 export const DUPLICATE_START_TOLERANCE_SECONDS = 3;
 export const DUPLICATE_DURATION_TOLERANCE_SECONDS = 3;
 
+export function assertDistinctWorkspaces(
+  fromWorkspaceId: number,
+  toWorkspaceId: number,
+): void {
+  if (fromWorkspaceId === toWorkspaceId) {
+    throw new Error("FROM and TO must be different workspaces.");
+  }
+}
+
 export function entryWorkspaceId(entry: TogglTimeEntry): number | undefined {
   return entry.workspace_id ?? entry.wid;
 }

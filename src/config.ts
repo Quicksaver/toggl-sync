@@ -35,16 +35,13 @@ export function validateConfig(value: unknown): asserts value is SyncConfig {
   }
 }
 
-function validateTokens(config: SyncConfig): void {
+export function validateTokens(config: SyncConfig): void {
   const placeholders = ["", "PASTE_FROM_ACCOUNT_API_TOKEN_HERE", "PASTE_TO_ACCOUNT_API_TOKEN_HERE"];
   if (placeholders.includes(config.from.apiToken.trim())) {
     throw new Error(`Set from.apiToken in ${CONFIG_PATH}.`);
   }
   if (placeholders.includes(config.to.apiToken.trim())) {
     throw new Error(`Set to.apiToken in ${CONFIG_PATH}.`);
-  }
-  if (config.from.apiToken === config.to.apiToken) {
-    throw new Error("FROM ACCOUNT and TO ACCOUNT must use different API tokens.");
   }
 }
 
@@ -80,4 +77,3 @@ export async function saveConfig(config: SyncConfig): Promise<void> {
   await rename(temporaryPath, CONFIG_PATH);
   await chmod(CONFIG_PATH, 0o600);
 }
-

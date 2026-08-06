@@ -1,6 +1,6 @@
 # toggl-sync
 
-One-way, review-before-write copying of completed Toggl Track entries from one account to another.
+One-way, review-before-write copying of completed Toggl Track entries between workspaces, whether they belong to one account or two.
 
 ## Setup
 
@@ -11,6 +11,8 @@ yarn install
 ```
 
 Open `toggl-sync.config.json` and replace both token placeholders. Each API token is available at the bottom of the corresponding Toggl Track Profile page. The config is gitignored and is written with owner-only permissions whenever the CLI updates it.
+
+For two workspaces accessible through the same Toggl login, use the same API token in both fields. The CLI will select and save the FROM and TO workspaces independently. The exact same workspace cannot be used as both endpoints.
 
 ```json
 {
